@@ -8,8 +8,6 @@
     body { background-color: #f5f5f5; }
     .container { max-width: 900px; margin-top: 40px; }
     .table td, .table th { vertical-align: middle; }
-    .tick { color: green; font-weight: bold; }
-    .wrong { color: red; font-weight: bold; }
     .btn-sm { padding: 2px 8px; font-size: 0.8rem; }
   </style>
 </head>
@@ -32,13 +30,18 @@
       <div class="col-md-1 d-grid">
         <button type="submit" class="btn btn-primary">Add</button>
       </div>
-    </form><table class="table table-bordered table-hover">
+    </form><div class="mb-3">
+  <button class="btn btn-warning" onclick="toggleActions()">Toggle Edit/Delete</button>
+</div>
+
+<table class="table table-bordered table-hover">
   <thead class="table-dark">
     <tr>
       <th>Match</th>
       <th>Time</th>
       <th>Prediction</th>
-      <th>Results</th>
+      <th>Result</th>
+      <th id="actionHeader">Action</th>
     </tr>
   </thead>
   <tbody id="predictionTable">
@@ -56,6 +59,66 @@
     const form = document.getElementById('predictionForm');
     const tableBody = document.getElementById('predictionTable');
     const shareText = document.getElementById('shareText');
+    let showActions = true;
+
+    let predictions = JSON.parse(localStorage.getItem('predictions')) || [];
+
+    function saveToLocalStorage() {
+      localStorage.setItem('predictions', JSON.stringify(predictions));
+    }
+
+    function renderTable() {
+      tableBody.innerHTML = '';
+      predictions.forEach((item, index) => {
+        const row = document.createElement('tr');
+        const actions = showActions ? `
+            <button class="btn btn-success btn-sm" onclick="editRow(${index})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteRow(${index})">🗑️</button>
+          ` : '';
+
+        row.innerHTML = `
+          <td>${item.match}</td>
+          <td>${item.time}</td>
+          <td>${item.prediction}</td>
+          <td>
+            <button class="btn btn-outline-success btn-sm" onclick="setResult(${index}, '✔️')">✔️</button>
+            <button class="btn btn-outline-danger btn-sm" onclick="setResult(${index}, '❌')">❌</button>
+            <span class="ms-2">${item.result || ''}</span>
+          </td>
+          <td>${actions}</td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    function toggleActions() {
+      showActions = !showActions;
+      renderTable();
+    }
+
+    function deleteRow(index) {
+      predictions.splice(index, 1);
+      saveToLocalStorage();
+      renderTable();
+    }
+
+    function editRow(index) {
+      const item = predictions[index];
+      const [teamA, teamB] = item.match.split(' vs ');
+      document.getElementById('teamA').value = teamA;
+      document.getElementById('teamB').value = teamB;
+      document.getElementById('time').value = item.time;
+      document.getElementById('prediction').value = item.prediction;
+      predictions.splice(index, 1);
+      saveToLocalStorage();
+      renderTable();
+    }
+
+    function setResult(index, result) {
+      predictions[index].result = result;
+      saveToLocalStorage();
+      renderTable();
+    }
 
     form.addEventListener('submit', function(event) {
       event.preventDefault();
@@ -65,32 +128,16 @@
       const prediction = document.getElementById('prediction').value;
       const match = `${teamA} vs ${teamB}`;
 
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${match}</td>
-        <td>${time}</td>
-        <td>${prediction}</td>
-        <td>
-          <button class="btn btn-success btn-sm" onclick="markResult(this, '✔️')">✔️</button>
-          <button class="btn btn-danger btn-sm" onclick="markResult(this, '❌')">❌</button>
-        </td>
-      `;
-
-      tableBody.appendChild(row);
+      predictions.push({ match, time, prediction, result: '' });
+      saveToLocalStorage();
+      renderTable();
       form.reset();
     });
 
-    function markResult(button, result) {
-      const cell = button.parentElement;
-      cell.innerHTML = result;
-    }
-
     function copyShareable() {
       let text = '📋 *My Predictions Today*\n\n';
-      const rows = document.querySelectorAll('#predictionTable tr');
-      rows.forEach(row => {
-        const cols = row.querySelectorAll('td');
-        text += `⚽ ${cols[0].innerText} | ${cols[1].innerText} | ${cols[2].innerText}\n`;
+      predictions.forEach(p => {
+        text += `⚽ ${p.match} | ${p.time} | ${p.prediction}\n`;
       });
       shareText.value = text;
       shareText.select();
@@ -99,14 +146,14 @@
 
     function copyAll() {
       let text = '📋 *All Predictions Only*\n\n';
-      const rows = document.querySelectorAll('#predictionTable tr');
-      rows.forEach(row => {
-        const cols = row.querySelectorAll('td');
-        text += `⚽ ${cols[0].innerText} | ${cols[1].innerText} | ${cols[2].innerText}\n`;
+      predictions.forEach(p => {
+        text += `⚽ ${p.match} | ${p.time} | ${p.prediction}\n`;
       });
       shareText.value = text;
       shareText.select();
       document.execCommand('copy');
     }
+
+    renderTable();
   </script></body>
 </html>
